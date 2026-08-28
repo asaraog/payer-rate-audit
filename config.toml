@@ -1,0 +1,43 @@
+# payer-rate-audit configuration.
+#
+# Both values below change every year and are NOT scraped or hardcoded in source.
+# Update them from the annual Medicare Physician Fee Schedule final rule before
+# running an audit against a new year's data.
+
+[medicare]
+# CY2026 PFS conversion factor, non-qualifying-APM-participant ("non-QP") value,
+# as finalized in the CY2026 PFS final rule. Beginning CY2026 a second, higher
+# conversion factor applies to Qualifying APM Participants; set this to whichever
+# one your comparison is against.
+conversion_factor = 33.4009
+conversion_factor_source = "CY2026 PFS final rule, non-QP conversion factor"
+
+[rvu]
+# Calendar year of the PPRRVU file to use. scripts/fetch_rvu.py downloads the
+# latest quarterly release for this year into data/.
+year = 2026
+
+# PFS status codes whose RVUs are usable in a payment denominator. The PPRRVU
+# record layout states that only RVUs with status codes A, R, or T are used for
+# Medicare payment; every other status code is excluded from the denominator and
+# counted separately in the report.
+payable_status_codes = ["A", "R", "T"]
+
+[audit]
+# Which PPRRVU total-RVU column to use. See ASSUMPTIONS.md, decision 1.
+#   "auto"        - facility total for billing_class=professional rows,
+#                   non-facility total otherwise
+#   "facility"    - always facility total
+#   "nonfacility" - always non-facility total
+rvu_basis = "auto"
+
+# Grouping for the payer table: "plan" (one row per payer+plan) or
+# "payer" (aggregate across a payer's plans). See ASSUMPTIONS.md, decision 4.
+group_by = "plan"
+
+# Optional billing_class filter, e.g. "professional". Empty means no filter.
+# See ASSUMPTIONS.md, decision 3.
+billing_class_filter = ""
+
+# Join rate below this fraction triggers a loud warning in every output.
+min_join_rate = 0.60

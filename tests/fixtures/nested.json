@@ -1,0 +1,211 @@
+{
+  "hospital_name": "Fixture General Hospital",
+  "last_updated_on": "2026-01-15",
+  "version": "3.0.0",
+  "location_name": ["Fixture General Hospital"],
+  "hospital_address": ["1 Test Way, Albany, NY 12201"],
+  "license_information": { "license_number": "99999", "state": "NY" },
+  "type_2_npi": ["0000000001"],
+  "attestation": {
+    "attestation": "To the best of its knowledge and belief, this hospital has included all applicable standard charge information in accordance with the requirements of 45 CFR 180.50, and the information encoded is true, accurate, and complete as of the date in the file.",
+    "confirm_attestation": true,
+    "attester_name": "Pat Attester"
+  },
+  "standard_charge_information": [
+    {
+      "description": "Office visit level 3 established patient",
+      "code_information": [
+        { "code": "320", "type": "RC" },
+        { "code": "99213", "type": "CPT" }
+      ],
+      "standard_charges": [
+        {
+          "setting": "outpatient",
+          "billing_class": "professional",
+          "gross_charge": 210,
+          "discounted_cash": 150,
+          "minimum": 80,
+          "maximum": 120,
+          "payers_information": [
+            { "payer_name": "Alpha Health", "plan_name": "PPO", "methodology": "fee schedule", "standard_charge_dollar": 120 },
+            { "payer_name": "Beta Mutual", "plan_name": "HMO", "methodology": "fee schedule", "standard_charge_dollar": 80 }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "MRI brain without contrast",
+      "code_information": [
+        { "code": "611", "type": "RC" },
+        { "code": "70551", "type": "CPT" }
+      ],
+      "standard_charges": [
+        {
+          "setting": "outpatient",
+          "billing_class": "facility",
+          "modifier_code": ["26"],
+          "gross_charge": 2400,
+          "discounted_cash": 1900,
+          "minimum": 600,
+          "maximum": 900,
+          "payers_information": [
+            { "payer_name": "Alpha Health", "plan_name": "PPO", "methodology": "fee schedule", "standard_charge_dollar": 900 },
+            { "payer_name": "Beta Mutual", "plan_name": "HMO", "methodology": "fee schedule", "standard_charge_dollar": 600 }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Knee arthroscopy",
+      "code_information": [
+        { "code": "360", "type": "RC" },
+        { "code": "29881", "type": "CPT" }
+      ],
+      "standard_charges": [
+        {
+          "setting": "outpatient",
+          "billing_class": "professional",
+          "gross_charge": 9000,
+          "discounted_cash": 7200,
+          "minimum": 3300,
+          "maximum": 4100,
+          "payers_information": [
+            { "payer_name": "Alpha Health", "plan_name": "PPO", "methodology": "case rate", "standard_charge_dollar": 4100 },
+            { "payer_name": "Beta Mutual", "plan_name": "HMO", "methodology": "case rate", "standard_charge_dollar": 3300 }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Screening colonoscopy",
+      "code_information": [
+        { "code": "306", "type": "RC" },
+        { "code": "45378", "type": "CPT" }
+      ],
+      "standard_charges": [
+        {
+          "setting": "outpatient",
+          "billing_class": "professional",
+          "gross_charge": 3000,
+          "discounted_cash": 900,
+          "minimum": 700,
+          "maximum": 1200,
+          "payers_information": [
+            { "payer_name": "Alpha Health", "plan_name": "PPO", "methodology": "fee schedule", "standard_charge_dollar": 1200 },
+            { "payer_name": "Beta Mutual", "plan_name": "HMO", "methodology": "fee schedule", "standard_charge_dollar": 700 }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Major joint replacement without MCC",
+      "code_information": [{ "code": "470", "type": "MS-DRG" }],
+      "standard_charges": [
+        {
+          "setting": "inpatient",
+          "billing_class": "facility",
+          "gross_charge": 52000,
+          "discounted_cash": 41000,
+          "minimum": 24000,
+          "maximum": 31000,
+          "payers_information": [
+            { "payer_name": "Alpha Health", "plan_name": "PPO", "methodology": "case rate", "standard_charge_dollar": 31000 }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Deleted legacy imaging code",
+      "code_information": [{ "code": "0042T", "type": "CPT" }],
+      "standard_charges": [
+        {
+          "setting": "outpatient",
+          "billing_class": "professional",
+          "gross_charge": 500,
+          "discounted_cash": 400,
+          "minimum": 275,
+          "maximum": 275,
+          "payers_information": [
+            { "payer_name": "Alpha Health", "plan_name": "PPO", "methodology": "fee schedule", "standard_charge_dollar": 275 }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Bundled supply item",
+      "code_information": [
+        { "code": "270", "type": "RC" },
+        { "code": "A4550", "type": "HCPCS" }
+      ],
+      "standard_charges": [
+        {
+          "setting": "outpatient",
+          "billing_class": "facility",
+          "gross_charge": 40,
+          "discounted_cash": 30,
+          "minimum": 22,
+          "maximum": 22,
+          "payers_information": [
+            { "payer_name": "Alpha Health", "plan_name": "PPO", "methodology": "fee schedule", "standard_charge_dollar": 22 }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Percent-of-charges service",
+      "code_information": [
+        { "code": "450", "type": "RC" },
+        { "code": "99284", "type": "CPT" }
+      ],
+      "standard_charges": [
+        {
+          "setting": "outpatient",
+          "billing_class": "facility",
+          "gross_charge": 1500,
+          "discounted_cash": 1200,
+          "additional_generic_notes": "Percentage contract; no dollar amount knowable in advance.",
+          "payers_information": [
+            {
+              "payer_name": "Gamma Care",
+              "plan_name": "EPO",
+              "methodology": "percent of total billed charges",
+              "standard_charge_percentage": 65,
+              "median_amount": 975,
+              "10th_percentile": 800,
+              "90th_percentile": 1100,
+              "count": "42"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Algorithm-priced service",
+      "code_information": [
+        { "code": "450", "type": "RC" },
+        { "code": "99285", "type": "CPT" }
+      ],
+      "standard_charges": [
+        {
+          "setting": "outpatient",
+          "billing_class": "facility",
+          "gross_charge": 2100,
+          "discounted_cash": 1700,
+          "additional_generic_notes": "Algorithm contract; see notes.",
+          "payers_information": [
+            {
+              "payer_name": "Gamma Care",
+              "plan_name": "EPO",
+              "methodology": "other",
+              "standard_charge_algorithm": "110% of the 2026 Medicare OPPS rate",
+              "median_amount": 1450,
+              "10th_percentile": 1200,
+              "90th_percentile": 1600,
+              "count": "17"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

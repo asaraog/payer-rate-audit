@@ -1,0 +1,12 @@
+hospital_name,last_updated_on,version,location_name,hospital_address,license_number|NY,type_2_npi,"To the best of its knowledge and belief, this hospital has included all applicable standard charge information in accordance with the requirements of 45 CFR 180.50, and the information encoded is true, accurate, and complete as of the date in the file.",attester_name
+Fixture General Hospital,2026-01-15,3.0.0,Fixture General Hospital,"1 Test Way, Albany, NY 12201",99999,0000000001,TRUE,Pat Attester
+description,code|1,code|1|type,code|2,code|2|type,modifiers,setting,billing_class,standard_charge|gross,standard_charge|discounted_cash,standard_charge|Alpha Health|PPO|negotiated_dollar,standard_charge|Alpha Health|PPO|negotiated_percentage,standard_charge|Alpha Health|PPO|negotiated_algorithm,standard_charge|Alpha Health|PPO|methodology,standard_charge|Beta Mutual|HMO|negotiated_dollar,standard_charge|Beta Mutual|HMO|negotiated_percentage,standard_charge|Beta Mutual|HMO|negotiated_algorithm,standard_charge|Beta Mutual|HMO|methodology,standard_charge|Gamma Care|EPO|negotiated_dollar,standard_charge|Gamma Care|EPO|negotiated_percentage,standard_charge|Gamma Care|EPO|negotiated_algorithm,standard_charge|Gamma Care|EPO|methodology,standard_charge|min,standard_charge|max,additional_generic_notes
+Office visit level 3 established patient,320,RC,99213,CPT,,outpatient,professional,210,150,120,,,fee schedule,80,,,fee schedule,,,,,80,120,
+MRI brain without contrast,611,RC,70551,CPT,26,outpatient,facility,2400,1900,900,,,fee schedule,600,,,fee schedule,,,,,600,900,
+Knee arthroscopy,360,RC,29881,CPT,,outpatient,professional,9000,7200,4100,,,case rate,3300,,,case rate,,,,,3300,4100,
+Screening colonoscopy,306,RC,45378,CPT,,outpatient,professional,3000,900,1200,,,fee schedule,700,,,fee schedule,,,,,700,1200,
+Major joint replacement without MCC,470,MS-DRG,,,,inpatient,facility,52000,41000,31000,,,case rate,,,,,,,,,24000,31000,
+Deleted legacy imaging code,,,0042T,CPT,,outpatient,professional,500,400,275,,,fee schedule,,,,,,,,,275,275,
+Bundled supply item,270,RC,A4550,HCPCS,,outpatient,facility,40,30,22,,,fee schedule,,,,,,,,,22,22,
+Percent-of-charges service,450,RC,99284,CPT,,outpatient,facility,1500,1200,,,,,,,,,,65,,percent of total billed charges,,,Percentage contract; no dollar amount knowable in advance.
+Algorithm-priced service,450,RC,99285,CPT,,outpatient,facility,2100,1700,,,,,,,,,,,110% of the 2026 Medicare OPPS rate,other,,,Algorithm contract; see notes.
