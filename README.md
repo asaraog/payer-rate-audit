@@ -9,7 +9,7 @@ different services. This tool divides what each payer pays by the RVUs of the wo
 (relative value units — Medicare's public per-code work weights), so every payer becomes one comparable
 number — **dollars per unit of work, as a multiple of Medicare.**
 
-## Example
+## Real-life example
 
 Community Hospital (Fairfax, MO), from their
 [price transparency page](https://fairfaxmed.com/price-transparency/):
