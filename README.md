@@ -6,7 +6,7 @@
 
 Dollar totals can't answer that: different payers cover different patients getting
 different services. This tool divides what each payer pays by the RVUs of the work
-(Medicare's public per-code work weights), so every payer becomes one comparable
+(relative value units — Medicare's public per-code work weights), so every payer becomes one comparable
 number — **dollars per unit of work, as a multiple of Medicare.**
 
 ## Example
