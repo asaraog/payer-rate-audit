@@ -43,7 +43,8 @@ payer-rate-audit MRF --era era/              # same, from your 835 remittances
 
 ## Example: a real hospital
 
-Run against Community Hospital (Fairfax, MO)'s published standard charges file
+Run against Community Hospital (Fairfax, MO)'s published standard charges file,
+from their [price transparency page](https://fairfaxmed.com/price-transparency/)
 (3,789 rows, CSV tall, v2.0.0 template — 97.7% join rate):
 
 ```
