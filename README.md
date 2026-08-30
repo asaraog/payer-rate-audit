@@ -1,5 +1,7 @@
 # payer-rate-audit
 
+[![CI](https://github.com/asaraog/payer-rate-audit/actions/workflows/ci.yml/badge.svg)](https://github.com/asaraog/payer-rate-audit/actions/workflows/ci.yml)
+
 **Compare payers on rate alone, with case mix normalized out.**
 
 A practice comparing two contracts cannot compare dollar totals: the two payers saw
