@@ -42,8 +42,8 @@ payer-rate-audit MRF --eob eobs/             # reprice your observed mix (below)
 
 ## Example: a real hospital
 
-Run against Community Hospital (Fairfax, MO)'s published
-[standard charges file](https://fairfaxmed.com/wp-content/uploads/2026/03/STANDARD-CHARGES-DOWNLOAD-2026-01-01.csv)
+Run against the published standard charges file of
+[Community Hospital (Fairfax, MO)](https://fairfaxmed.com/)
 (3,789 rows, CSV tall, v2.0.0 template — 97.7% join rate):
 
 ```
