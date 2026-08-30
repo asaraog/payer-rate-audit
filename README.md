@@ -64,8 +64,7 @@ Reads any hospital's CMS price transparency file — all three official shapes
 - Repricing is arithmetic on posted rates — not an adjudication model.
 - A code's RVUs depend on who pays the overhead, so professional and
   institutional rows use different RVU totals. Two payers can post the same
-  dollar and score differently because of it: safe within one hospital's file,
-  risky across files.
+  dollar and score differently because they cost different amounts of RVUs.
 - Rows priced as a percentage or algorithm are excluded and counted, never
   converted to invented dollars.
 
