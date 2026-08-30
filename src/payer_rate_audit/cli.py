@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from .config import GROUP_BY_CHOICES, RVU_BASIS_CHOICES, ConfigError, load_config
+from .eob import EOBFormatError, eob_audit
 from .metrics import audit
 from .mrf import MRFFormatError, parse_mrf
 from .report import render_console, render_html
@@ -26,15 +27,27 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", default="config.toml", help="Path to config.toml")
     parser.add_argument("--rvu-file", help="Path to a PPRRVU CSV (default: newest in --data-dir)")
     parser.add_argument("--data-dir", default="data", help="Where fetch_rvu.py put the RVU file")
-    parser.add_argument("--rvu-basis", choices=RVU_BASIS_CHOICES,
-                        help="Override [audit].rvu_basis")
+    parser.add_argument("--rvu-basis", choices=RVU_BASIS_CHOICES, help="Override [audit].rvu_basis")
     parser.add_argument("--group-by", choices=GROUP_BY_CHOICES, help="Override [audit].group_by")
-    parser.add_argument("--billing-class", help="Only count rows with this billing_class "
-                                                "(e.g. professional); 'both' rows always count")
+    parser.add_argument(
+        "--billing-class",
+        help="Only count rows with this billing_class "
+        "(e.g. professional); 'both' rows always count",
+    )
+    parser.add_argument(
+        "--eob",
+        metavar="PATH",
+        help="Directory of CARIN Blue Button FHIR R4 ExplanationOfBenefit "
+        "bundles, or a single JSON/NDJSON file; adds the observed service "
+        "mix repriced at each payer's rates",
+    )
     parser.add_argument("--html", metavar="PATH", help="Write a self-contained HTML report")
-    parser.add_argument("--csv-out", metavar="DIR",
-                        help="Also write payer_table.csv, spread.csv, cash_beats_contract.csv "
-                             "and unmatched_codes.csv to DIR")
+    parser.add_argument(
+        "--csv-out",
+        metavar="DIR",
+        help="Also write payer_table.csv, spread.csv, cash_beats_contract.csv "
+        "and unmatched_codes.csv to DIR",
+    )
     parser.add_argument("--top", type=int, default=25, help="Rows per detail table (default 25)")
     parser.add_argument("--quiet", action="store_true", help="Suppress the console report")
     return parser
@@ -72,11 +85,19 @@ def main(argv: list[str] | None = None) -> int:
 
     result = audit(parse_result, rvu_table, config)
 
+    eob = None
+    if args.eob:
+        try:
+            eob = eob_audit(args.eob, result.join, group_by=config.group_by)
+        except EOBFormatError as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 1
+
     if not args.quiet:
-        print(render_console(result, top_n=args.top))
+        print(render_console(result, top_n=args.top, eob=eob))
 
     if args.html:
-        Path(args.html).write_text(render_html(result, top_n=args.top), encoding="utf-8")
+        Path(args.html).write_text(render_html(result, top_n=args.top, eob=eob), encoding="utf-8")
         print(f"wrote {args.html}")
 
     if args.csv_out:
@@ -86,7 +107,12 @@ def main(argv: list[str] | None = None) -> int:
         result.spread.to_csv(out_dir / "spread.csv", index=False)
         result.cash_beats_contract.to_csv(out_dir / "cash_beats_contract.csv", index=False)
         result.join.unmatched_codes.to_csv(out_dir / "unmatched_codes.csv", index=False)
-        print(f"wrote 4 CSVs to {out_dir}")
+        written = 4
+        if eob is not None:
+            eob.repriced.to_csv(out_dir / "eob_repriced.csv", index=False)
+            eob.utilization.to_csv(out_dir / "eob_utilization.csv", index=False)
+            written += 2
+        print(f"wrote {written} CSVs to {out_dir}")
 
     # A join rate below the configured floor is a result the caller should be
     # able to act on, not just read.

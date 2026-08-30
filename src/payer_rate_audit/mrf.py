@@ -533,11 +533,25 @@ def parse_json(path: str | Path) -> ParseResult:
 
 def _to_frame(records: list[dict[str, Any]]) -> pd.DataFrame:
     frame = pd.DataFrame(records, columns=NORMALIZED_COLUMNS)
-    for column in ("negotiated_dollar", "gross_charge", "discounted_cash",
-                   "min_negotiated", "max_negotiated"):
+    for column in (
+        "negotiated_dollar",
+        "gross_charge",
+        "discounted_cash",
+        "min_negotiated",
+        "max_negotiated",
+    ):
         frame[column] = pd.to_numeric(frame[column], errors="coerce")
-    for column in ("code", "code_type", "modifiers", "description", "billing_class",
-                   "setting", "payer_name", "plan_name", "methodology"):
+    for column in (
+        "code",
+        "code_type",
+        "modifiers",
+        "description",
+        "billing_class",
+        "setting",
+        "payer_name",
+        "plan_name",
+        "methodology",
+    ):
         frame[column] = frame[column].fillna("").astype(str)
     return frame
 

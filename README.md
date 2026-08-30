@@ -62,6 +62,7 @@ payer-rate-audit MRF --group-by payer        # aggregate a payer's plans
 payer-rate-audit MRF --billing-class professional
 payer-rate-audit MRF --rvu-basis facility    # override the auto facility/non-facility pick
 payer-rate-audit MRF --csv-out out/          # payer table, spread, cash flags, unmatched
+payer-rate-audit MRF --eob eobs/             # add the observed mix, repriced (below)
 ```
 
 Exit code `3` means the join rate fell below `[audit].min_join_rate` (default 0.60) — the
@@ -118,6 +119,36 @@ every row that did not reach the denominator — out-of-scope code types (DRG, A
 ICD, revenue codes), CPT/HCPCS codes absent from the PPRRVU file, non-separately-payable
 PFS status codes, zero-RVU rows, and charges stated as a percentage or algorithm instead
 of a dollar amount. Unmatched codes are enumerated, never dropped in silence.
+
+### Optional: the observed service mix, repriced
+
+`--eob PATH` takes a directory of CARIN Blue Button-conformant FHIR R4
+`ExplanationOfBenefit` bundles or resources (`*.json`, `*.ndjson`, recursively) or a single
+NDJSON file, and answers the follow-on question: *given what we actually did, what would
+each payer have paid, and how does that compare to what we were paid?*
+
+Per line item it extracts the HCPCS/CPT code from `item.productOrService`, modifiers,
+service date, units, and the `item.adjudication` submitted / allowed / paid amounts. Both
+the HL7 adjudication slices (`submitted`, `eligible`, `benefit`) and the Blue Button 2.0
+CMS claim variables (`line_sbmtd_chrg_amt`, `line_alowd_chrg_amt`, `line_prvdr_pmt_amt`)
+are recognized, because production files use both. Line items with no usable HCPCS/CPT
+coding are **counted and reported**, not dropped; so are non-EOB resources and unreadable
+files.
+
+The repriced table multiplies each observed code's units by that payer's mean negotiated
+dollar for the code, and shows actually-paid, repriced, the dollar delta, and how many of
+the observed codes the payer does not publish a rate for. `--csv-out` additionally writes
+`eob_repriced.csv` and `eob_utilization.csv`.
+
+Data source: the CMS Blue Button 2.0 sandbox is the intended input (10,000 synthetic
+beneficiaries, negative patient IDs, no PHI) but needs OAuth app registration, so the
+committed fixtures under `tests/fixtures/eob/` are hand-authored in the shape of the Blue
+Button 2.0 / CARIN implementation-guide examples. Synthea is deliberately not used: its
+claims are SNOMED-coded and will not join to HCPCS.
+
+**Caveat.** Repricing is arithmetic on published rates, not an adjudication model: no
+coverage rules, bundling, multiple-procedure reduction, modifier pricing percentages, or
+patient responsibility. It answers "at the posted rate", nothing more.
 
 Verified end to end against real published MRFs in all three shapes as well as the CMS
 example files; see `ASSUMPTIONS.md` for the domain calls made along the way, each of which

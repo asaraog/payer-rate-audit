@@ -114,8 +114,17 @@ def join_rvu(parse: ParseResult, rvu: RVUTable, config: Config) -> JoinResult:
     rvu_frame = rvu.frame
     keyed = rvu_frame.set_index(["hcpcs", "modifier"])
     base = rvu_frame[rvu_frame["modifier"] == ""].set_index("hcpcs")
-    rvu_fields = ["status_code", "work_rvu", "nonfac_pe_rvu", "fac_pe_rvu", "mp_rvu",
-                  "nonfac_total", "fac_total", "pctc_indicator", "global_days"]
+    rvu_fields = [
+        "status_code",
+        "work_rvu",
+        "nonfac_pe_rvu",
+        "fac_pe_rvu",
+        "mp_rvu",
+        "nonfac_total",
+        "fac_total",
+        "pctc_indicator",
+        "global_days",
+    ]
 
     with_modifier = frame.join(
         keyed[rvu_fields],
@@ -183,8 +192,16 @@ def payer_table(join: JoinResult, config: Config) -> pd.DataFrame:
     counted = frame[frame["counted"]]
     if counted.empty:
         return pd.DataFrame(
-            columns=[*keys, "rows_counted", "rows_seen", "rows_excluded", "negotiated_dollars",
-                     "total_rvus", "effective_cf", "ratio_to_medicare"]
+            columns=[
+                *keys,
+                "rows_counted",
+                "rows_seen",
+                "rows_excluded",
+                "negotiated_dollars",
+                "total_rvus",
+                "effective_cf",
+                "ratio_to_medicare",
+            ]
         )
 
     aggregated = (
@@ -212,8 +229,15 @@ def cash_beats_contract(join: JoinResult) -> pd.DataFrame:
         & frame["negotiated_dollar"].notna()
         & (frame["discounted_cash"] < frame["negotiated_dollar"])
     )
-    columns = ["payer_name", "plan_name", "code", "code_type", "description",
-               "discounted_cash", "negotiated_dollar"]
+    columns = [
+        "payer_name",
+        "plan_name",
+        "code",
+        "code_type",
+        "description",
+        "discounted_cash",
+        "negotiated_dollar",
+    ]
     result = frame.loc[mask, columns].copy()
     if result.empty:
         return result.assign(gap=pd.Series(dtype=float), cash_share=pd.Series(dtype=float))
@@ -233,8 +257,18 @@ def spread(join: JoinResult) -> pd.DataFrame:
     frame = frame[multi_payer]
     if frame.empty:
         return pd.DataFrame(
-            columns=["code", "code_type", "description", "payers", "min_dollar", "min_payer",
-                     "max_dollar", "max_payer", "gap", "ratio"]
+            columns=[
+                "code",
+                "code_type",
+                "description",
+                "payers",
+                "min_dollar",
+                "min_payer",
+                "max_dollar",
+                "max_payer",
+                "gap",
+                "ratio",
+            ]
         )
     rows = []
     for (code, code_type), group in frame.groupby(["code", "code_type"], dropna=False):

@@ -64,8 +64,13 @@ def test_effective_conversion_factor_and_ratio(parsed, rvu, config):
 
 def test_every_aggregate_states_its_denominator(parsed, rvu, config):
     table = audit(parsed, rvu, config).payer_table
-    for column in ("rows_counted", "rows_seen", "rows_excluded", "negotiated_dollars",
-                   "total_rvus"):
+    for column in (
+        "rows_counted",
+        "rows_seen",
+        "rows_excluded",
+        "negotiated_dollars",
+        "total_rvus",
+    ):
         assert column in table.columns
         assert table[column].notna().all()
     assert (table["rows_seen"] == table["rows_counted"] + table["rows_excluded"]).all()

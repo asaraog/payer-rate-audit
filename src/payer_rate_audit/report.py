@@ -12,9 +12,35 @@ from typing import Any
 
 import pandas as pd
 
+from .eob import EOBAudit
 from .metrics import EXCLUSION_LABELS, AuditResult, header_facts
 
 _TOP_N = 25
+
+_REPRICE_COLUMNS = {
+    "payer_name": "Payer",
+    "plan_name": "Plan",
+    "codes_priced": "Codes priced",
+    "codes_unpriced": "Codes unpriced",
+    "units_priced": "Units",
+    "actual_paid": "Actually paid $",
+    "repriced": "Repriced $",
+    "delta": "Delta $",
+    "ratio": "x actual",
+}
+_REPRICE_FORMATS = {
+    "codes_priced": ",d",
+    "codes_unpriced": ",d",
+    "units_priced": ",.0f",
+    "actual_paid": ",.2f",
+    "repriced": ",.2f",
+    "delta": ",.2f",
+    "ratio": ",.2f",
+}
+
+
+def _reprice_columns(frame: pd.DataFrame) -> dict[str, str]:
+    return {key: label for key, label in _REPRICE_COLUMNS.items() if key in frame.columns}
 
 
 def _fmt(value: Any, spec: str = "") -> str:
@@ -33,8 +59,7 @@ def _text_table(frame: pd.DataFrame, columns: dict[str, str], formats: dict[str,
         return "  (none)"
     headers = list(columns.values())
     rows = [
-        [_fmt(row[key], formats.get(key, "")) for key in columns]
-        for _, row in frame.iterrows()
+        [_fmt(row[key], formats.get(key, "")) for key in columns] for _, row in frame.iterrows()
     ]
     widths = [
         max(len(headers[i]), *(len(row[i]) for row in rows)) if rows else len(headers[i])
@@ -42,9 +67,7 @@ def _text_table(frame: pd.DataFrame, columns: dict[str, str], formats: dict[str,
     ]
     line = "  ".join(header.ljust(widths[i]) for i, header in enumerate(headers))
     separator = "  ".join("-" * width for width in widths)
-    body = "\n".join(
-        "  ".join(cell.ljust(widths[i]) for i, cell in enumerate(row)) for row in rows
-    )
+    body = "\n".join("  ".join(cell.ljust(widths[i]) for i, cell in enumerate(row)) for row in rows)
     return f"{line}\n{separator}\n{body}"
 
 
@@ -73,7 +96,7 @@ def _payer_columns(group_by: str) -> tuple[dict[str, str], dict[str, str]]:
     return columns, formats
 
 
-def render_console(result: AuditResult, top_n: int = _TOP_N) -> str:
+def render_console(result: AuditResult, top_n: int = _TOP_N, eob: EOBAudit | None = None) -> str:
     facts = header_facts(result)
     join = result.join
     lines: list[str] = []
@@ -84,21 +107,30 @@ def render_console(result: AuditResult, top_n: int = _TOP_N) -> str:
     add("=" * 78)
     add(f"MRF file            : {facts['mrf_file']} ({facts['mrf_shape']})")
     add(f"Hospital            : {facts['hospital']}")
-    add(f"MRF last updated    : {facts['mrf_last_updated']}  "
-        f"(template v{facts['mrf_template_version']})")
+    add(
+        f"MRF last updated    : {facts['mrf_last_updated']}  "
+        f"(template v{facts['mrf_template_version']})"
+    )
     add(f"RVU file            : {facts['rvu_file']} (year {facts['rvu_year']})")
-    add(f"Medicare CF         : {facts['medicare_conversion_factor']} "
-        f"[{facts['conversion_factor_source']}]")
-    add(f"RVU basis           : {facts['rvu_basis']}   "
-        f"billing_class filter: {facts['billing_class_filter']}")
+    add(
+        f"Medicare CF         : {facts['medicare_conversion_factor']} "
+        f"[{facts['conversion_factor_source']}]"
+    )
+    add(
+        f"RVU basis           : {facts['rvu_basis']}   "
+        f"billing_class filter: {facts['billing_class_filter']}"
+    )
     add(
         f"Rows                : {facts['normalized_rows']:,} normalized -> "
         f"{facts['in_scope_rows']:,} CPT/HCPCS in scope -> {facts['matched_rows']:,} matched -> "
         f"{facts['counted_rows']:,} in the denominator"
     )
     join_rate = facts["join_rate"]
-    add(f"Join rate           : {join_rate:.1%}" if join_rate is not None
-        else "Join rate           : n/a (no CPT/HCPCS rows in scope)")
+    add(
+        f"Join rate           : {join_rate:.1%}"
+        if join_rate is not None
+        else "Join rate           : n/a (no CPT/HCPCS rows in scope)"
+    )
     add("Geography           : national RVUs, no GPCI locality adjustment applied")
 
     if result.warnings:
@@ -113,8 +145,10 @@ def render_console(result: AuditResult, top_n: int = _TOP_N) -> str:
         if count:
             add(f"  {count:>8,}  {EXCLUSION_LABELS[key]}")
     if result.parse.excluded_no_dollar:
-        add(f"  {result.parse.excluded_no_dollar:>8,}  charge stated as percentage or algorithm, "
-            "not a dollar amount")
+        add(
+            f"  {result.parse.excluded_no_dollar:>8,}  charge stated as percentage or algorithm, "
+            "not a dollar amount"
+        )
     if result.parse.excluded_no_code:
         add(f"  {result.parse.excluded_no_code:>8,}  charge with no usable billing code")
     if join.out_of_scope_by_code_type:
@@ -127,14 +161,18 @@ def render_console(result: AuditResult, top_n: int = _TOP_N) -> str:
         add(f"  non-joinable code types: {detail}")
 
     add("")
-    add("EFFECTIVE CONVERSION FACTOR BY PAYER"
-        + (" AND PLAN" if result.config.group_by == "plan" else " (aggregated across plans)"))
+    add(
+        "EFFECTIVE CONVERSION FACTOR BY PAYER"
+        + (" AND PLAN" if result.config.group_by == "plan" else " (aggregated across plans)")
+    )
     columns, formats = _payer_columns(result.config.group_by)
     add(_text_table(result.payer_table, columns, formats))
 
     add("")
-    add(f"UNMATCHED CPT/HCPCS CODES ({len(join.unmatched_codes):,} distinct; "
-        f"top {min(top_n, len(join.unmatched_codes))} by row count)")
+    add(
+        f"UNMATCHED CPT/HCPCS CODES ({len(join.unmatched_codes):,} distinct; "
+        f"top {min(top_n, len(join.unmatched_codes))} by row count)"
+    )
     add(
         _text_table(
             join.unmatched_codes.head(top_n),
@@ -144,8 +182,10 @@ def render_console(result: AuditResult, top_n: int = _TOP_N) -> str:
     )
 
     add("")
-    add(f"CASH BEATS CONTRACT ({len(result.cash_beats_contract):,} rows where the discounted "
-        f"cash price is below the negotiated rate; top {top_n} by gap)")
+    add(
+        f"CASH BEATS CONTRACT ({len(result.cash_beats_contract):,} rows where the discounted "
+        f"cash price is below the negotiated rate; top {top_n} by gap)"
+    )
     add(
         _text_table(
             result.cash_beats_contract.head(top_n),
@@ -179,6 +219,43 @@ def render_console(result: AuditResult, top_n: int = _TOP_N) -> str:
             {"min_dollar": ",.2f", "max_dollar": ",.2f", "gap": ",.2f", "payers": ",d"},
         )
     )
+
+    if eob is not None:
+        parse = eob.parse
+        add("")
+        add("OBSERVED UTILIZATION (FHIR ExplanationOfBenefit)")
+        add(f"  source              : {parse.source}")
+        add(
+            f"  read                : {parse.files_read:,} files, "
+            f"{parse.resources_read:,} resources, {parse.line_items_read:,} line items -> "
+            f"{parse.row_count:,} coded lines"
+        )
+        add(
+            f"  no usable HCPCS/CPT : {parse.line_items_without_code:,} line items "
+            "(reported, not dropped)"
+        )
+        if parse.non_eob_resources:
+            add(f"  non-EOB resources   : {parse.non_eob_resources:,} skipped")
+        if parse.unreadable_files:
+            add(f"  unreadable files    : {len(parse.unreadable_files):,}")
+        add("")
+        add("OBSERVED MIX REPRICED AT EACH PAYER'S CONTRACTED RATES")
+        add(_text_table(eob.repriced, _reprice_columns(eob.repriced), _REPRICE_FORMATS))
+        add("")
+        add(f"TOP CODES BY VOLUME (top {top_n})")
+        add(
+            _text_table(
+                eob.utilization.head(top_n),
+                {
+                    "code": "Code",
+                    "code_type": "Type",
+                    "line_items": "Lines",
+                    "units": "Units",
+                    "actual_paid": "Actually paid $",
+                },
+                {"line_items": ",d", "units": ",.0f", "actual_paid": ",.2f"},
+            )
+        )
     add("")
     return "\n".join(lines)
 
@@ -222,7 +299,46 @@ footer { margin-top: 3rem; color: #7b8794; font-size: 13px; }
 """
 
 
-def render_html(result: AuditResult, top_n: int = _TOP_N) -> str:
+def _eob_html(eob: EOBAudit | None, top_n: int) -> str:
+    if eob is None:
+        return ""
+    parse = eob.parse
+    facts = {
+        "EOB source": parse.source,
+        "Read": (
+            f"{parse.files_read:,} files / {parse.resources_read:,} resources / "
+            f"{parse.line_items_read:,} line items / {parse.row_count:,} coded lines"
+        ),
+        "Line items with no usable HCPCS/CPT": f"{parse.line_items_without_code:,}",
+        "Non-EOB resources skipped": f"{parse.non_eob_resources:,}",
+        "Unreadable files": f"{len(parse.unreadable_files):,}",
+    }
+    facts_html = "".join(
+        f"<dt>{html.escape(key)}</dt><dd>{html.escape(value)}</dd>" for key, value in facts.items()
+    )
+    return f"""
+<h2>Observed utilization (FHIR ExplanationOfBenefit)</h2>
+<dl class="facts">{facts_html}</dl>
+<h2>Observed mix repriced at each payer's contracted rates</h2>
+{_html_table(eob.repriced, _reprice_columns(eob.repriced), _REPRICE_FORMATS)}
+<h2>Top codes by volume</h2>
+{
+        _html_table(
+            eob.utilization.head(top_n),
+            {
+                "code": "Code",
+                "code_type": "Type",
+                "line_items": "Lines",
+                "units": "Units",
+                "actual_paid": "Actually paid $",
+            },
+            {"line_items": ",d", "units": ",.0f", "actual_paid": ",.2f"},
+        )
+    }
+"""
+
+
+def render_html(result: AuditResult, top_n: int = _TOP_N, eob: EOBAudit | None = None) -> str:
     facts = header_facts(result)
     join = result.join
     join_rate = facts["join_rate"]
@@ -284,7 +400,7 @@ def render_html(result: AuditResult, top_n: int = _TOP_N) -> str:
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Payer rate audit - {html.escape(facts['mrf_file'])}</title>
+<title>Payer rate audit - {html.escape(facts["mrf_file"])}</title>
 <style>{_CSS}</style></head><body>
 <h1>Payer rate audit</h1>
 <p class="sub">Negotiated dollars per RVU, by payer. Hospital outpatient rates: the methodology
@@ -292,25 +408,50 @@ transfers to physician-office economics, the dollars do not.</p>
 <dl class="facts">{facts_html}</dl>
 {warnings_html}
 <h2>Exclusions</h2>
-<ul class="exclusions">{''.join(exclusion_items) or '<li>none</li>'}</ul>
+<ul class="exclusions">{"".join(exclusion_items) or "<li>none</li>"}</ul>
 <h2>Effective conversion factor by payer</h2>
 {_html_table(result.payer_table, columns, formats)}
 <h2>Unmatched CPT/HCPCS codes ({len(join.unmatched_codes):,} distinct)</h2>
-{_html_table(join.unmatched_codes.head(top_n),
-             {"code": "Code", "code_type": "Type", "rows": "Rows",
-              "description": "MRF description"},
-             {"rows": ",d"})}
+{
+        _html_table(
+            join.unmatched_codes.head(top_n),
+            {"code": "Code", "code_type": "Type", "rows": "Rows", "description": "MRF description"},
+            {"rows": ",d"},
+        )
+    }
 <h2>Cash beats contract ({len(result.cash_beats_contract):,} rows)</h2>
-{_html_table(result.cash_beats_contract.head(top_n),
-             {"payer_name": "Payer", "plan_name": "Plan", "code": "Code",
-              "discounted_cash": "Cash $", "negotiated_dollar": "Negotiated $", "gap": "Gap $"},
-             {"discounted_cash": ",.2f", "negotiated_dollar": ",.2f", "gap": ",.2f"})}
+{
+        _html_table(
+            result.cash_beats_contract.head(top_n),
+            {
+                "payer_name": "Payer",
+                "plan_name": "Plan",
+                "code": "Code",
+                "discounted_cash": "Cash $",
+                "negotiated_dollar": "Negotiated $",
+                "gap": "Gap $",
+            },
+            {"discounted_cash": ",.2f", "negotiated_dollar": ",.2f", "gap": ",.2f"},
+        )
+    }
 <h2>Spread by code ({len(result.spread):,} codes)</h2>
-{_html_table(result.spread.head(top_n),
-             {"code": "Code", "code_type": "Type", "payers": "Payers", "min_dollar": "Min $",
-              "min_payer": "Min payer", "max_dollar": "Max $", "max_payer": "Max payer",
-              "gap": "Gap $"},
-             {"min_dollar": ",.2f", "max_dollar": ",.2f", "gap": ",.2f", "payers": ",d"})}
+{
+        _html_table(
+            result.spread.head(top_n),
+            {
+                "code": "Code",
+                "code_type": "Type",
+                "payers": "Payers",
+                "min_dollar": "Min $",
+                "min_payer": "Min payer",
+                "max_dollar": "Max $",
+                "max_payer": "Max payer",
+                "gap": "Gap $",
+            },
+            {"min_dollar": ",.2f", "max_dollar": ",.2f", "gap": ",.2f", "payers": ",d"},
+        )
+    }
+{_eob_html(eob, top_n)}
 <footer>Generated by payer-rate-audit. CPT descriptors are reproduced from the source MRF only;
 no AMA-licensed descriptor content is distributed with this tool.</footer>
 </body></html>
