@@ -38,6 +38,7 @@ payer-rate-audit MRF --html report.html      # one self-contained file
 payer-rate-audit MRF --group-by payer        # aggregate a payer's plans
 payer-rate-audit MRF --csv-out out/          # payer table, spread, cash flags, unmatched
 payer-rate-audit MRF --eob eobs/             # reprice your observed mix (below)
+payer-rate-audit MRF --era era/              # same, from your 835 remittances
 ```
 
 ## Example: a real hospital
@@ -80,6 +81,15 @@ trusting the run.
 and answers: *given what we actually did, what would each payer have paid, and how
 does that compare to what we were paid?* Repricing is arithmetic on published rates,
 not an adjudication model — no coverage rules, bundling, or modifier pricing.
+
+`--era PATH` does the same from X12 835 remittance advice, and is the input a practice
+actually has: the clearinghouse mailbox already holds the whole electronic book of
+business, today, with no integration project. FHIR EOB remains for institutions and the
+2027 Provider Access path; both flags can be given at once and are reported separately.
+Scope is the service line — claim-level `CAS`, `PLB`, reversals beyond netting, and COB
+are out, and every line skipped for any reason is counted in the exclusions like
+everything else here. 835 files are PHI: no patient identifier (`NM1*QC`, `CLP01`) is
+ever read into the output, and no real 835 belongs in this repo.
 
 ## Honest limits
 

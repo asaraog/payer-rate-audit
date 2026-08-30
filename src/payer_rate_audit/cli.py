@@ -8,11 +8,13 @@ import sys
 from pathlib import Path
 
 from .config import GROUP_BY_CHOICES, RVU_BASIS_CHOICES, ConfigError, load_config
-from .eob import EOBFormatError, eob_audit
+from .eob import eob_audit
 from .metrics import audit
 from .mrf import MRFFormatError, parse_mrf
 from .report import render_console, render_html
 from .rvu import RVUFormatError, load_rvu_table, parse_pprrvu
+from .utilization import LineFormatError, UtilizationAudit
+from .x12_835 import era_audit
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -40,6 +42,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory of CARIN Blue Button FHIR R4 ExplanationOfBenefit "
         "bundles, or a single JSON/NDJSON file; adds the observed service "
         "mix repriced at each payer's rates",
+    )
+    parser.add_argument(
+        "--era",
+        metavar="PATH",
+        help="Directory (searched recursively) of X12 835 remittance files, or "
+        "a single 835 file; adds the observed service mix repriced at each "
+        "payer's rates. Can be combined with --eob",
     )
     parser.add_argument("--html", metavar="PATH", help="Write a self-contained HTML report")
     parser.add_argument(
@@ -85,19 +94,27 @@ def main(argv: list[str] | None = None) -> int:
 
     result = audit(parse_result, rvu_table, config)
 
-    eob = None
-    if args.eob:
-        try:
+    sources: list[UtilizationAudit] = []
+    eob: UtilizationAudit | None = None
+    era: UtilizationAudit | None = None
+    try:
+        if args.eob:
             eob = eob_audit(args.eob, result.join, group_by=config.group_by)
-        except EOBFormatError as error:
-            print(f"error: {error}", file=sys.stderr)
-            return 1
+            sources.append(eob)
+        if args.era:
+            era = era_audit(args.era, result.join, group_by=config.group_by)
+            sources.append(era)
+    except LineFormatError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
 
     if not args.quiet:
-        print(render_console(result, top_n=args.top, eob=eob))
+        print(render_console(result, top_n=args.top, sources=sources))
 
     if args.html:
-        Path(args.html).write_text(render_html(result, top_n=args.top, eob=eob), encoding="utf-8")
+        Path(args.html).write_text(
+            render_html(result, top_n=args.top, sources=sources), encoding="utf-8"
+        )
         print(f"wrote {args.html}")
 
     if args.csv_out:
@@ -111,6 +128,10 @@ def main(argv: list[str] | None = None) -> int:
         if eob is not None:
             eob.repriced.to_csv(out_dir / "eob_repriced.csv", index=False)
             eob.utilization.to_csv(out_dir / "eob_utilization.csv", index=False)
+            written += 2
+        if era is not None:
+            era.repriced.to_csv(out_dir / "era_repriced.csv", index=False)
+            era.utilization.to_csv(out_dir / "era_utilization.csv", index=False)
             written += 2
         print(f"wrote {written} CSVs to {out_dir}")
 

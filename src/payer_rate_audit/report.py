@@ -7,13 +7,14 @@ survives being emailed to someone's compliance officer.
 from __future__ import annotations
 
 import html
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
 import pandas as pd
 
-from .eob import EOBAudit
 from .metrics import EXCLUSION_LABELS, AuditResult, header_facts
+from .utilization import UtilizationAudit
 
 _TOP_N = 25
 
@@ -37,6 +38,21 @@ _REPRICE_FORMATS = {
     "delta": ",.2f",
     "ratio": ",.2f",
 }
+
+
+_VOLUME_COLUMNS = {
+    "code": "Code",
+    "code_type": "Type",
+    "line_items": "Lines",
+    "units": "Units",
+    "actual_paid": "Actually paid $",
+}
+_VOLUME_FORMATS = {"line_items": ",d", "units": ",.0f", "actual_paid": ",.2f"}
+
+
+def _record_word(kind: str) -> str:
+    """What one record is called in the source format's own vocabulary."""
+    return "resources" if "FHIR" in kind else "transactions"
 
 
 def _reprice_columns(frame: pd.DataFrame) -> dict[str, str]:
@@ -96,7 +112,11 @@ def _payer_columns(group_by: str) -> tuple[dict[str, str], dict[str, str]]:
     return columns, formats
 
 
-def render_console(result: AuditResult, top_n: int = _TOP_N, eob: EOBAudit | None = None) -> str:
+def render_console(
+    result: AuditResult,
+    top_n: int = _TOP_N,
+    sources: Sequence[UtilizationAudit] = (),
+) -> str:
     facts = header_facts(result)
     join = result.join
     lines: list[str] = []
@@ -220,42 +240,31 @@ def render_console(result: AuditResult, top_n: int = _TOP_N, eob: EOBAudit | Non
         )
     )
 
-    if eob is not None:
-        parse = eob.parse
+    for source in sources:
+        parse = source.parse
         add("")
-        add("OBSERVED UTILIZATION (FHIR ExplanationOfBenefit)")
+        add(f"OBSERVED UTILIZATION ({parse.kind})")
         add(f"  source              : {parse.source}")
         add(
             f"  read                : {parse.files_read:,} files, "
-            f"{parse.resources_read:,} resources, {parse.line_items_read:,} line items -> "
+            f"{parse.records_read:,} {_record_word(parse.kind)}, "
+            f"{parse.line_items_read:,} line items -> "
             f"{parse.row_count:,} coded lines"
         )
         add(
             f"  no usable HCPCS/CPT : {parse.line_items_without_code:,} line items "
             "(reported, not dropped)"
         )
-        if parse.non_eob_resources:
-            add(f"  non-EOB resources   : {parse.non_eob_resources:,} skipped")
+        for reason, count in parse.exclusions.items():
+            add(f"  excluded            : {count:,} {reason}")
         if parse.unreadable_files:
             add(f"  unreadable files    : {len(parse.unreadable_files):,}")
         add("")
-        add("OBSERVED MIX REPRICED AT EACH PAYER'S CONTRACTED RATES")
-        add(_text_table(eob.repriced, _reprice_columns(eob.repriced), _REPRICE_FORMATS))
+        add(f"OBSERVED MIX REPRICED AT EACH PAYER'S CONTRACTED RATES ({parse.kind})")
+        add(_text_table(source.repriced, _reprice_columns(source.repriced), _REPRICE_FORMATS))
         add("")
-        add(f"TOP CODES BY VOLUME (top {top_n})")
-        add(
-            _text_table(
-                eob.utilization.head(top_n),
-                {
-                    "code": "Code",
-                    "code_type": "Type",
-                    "line_items": "Lines",
-                    "units": "Units",
-                    "actual_paid": "Actually paid $",
-                },
-                {"line_items": ",d", "units": ",.0f", "actual_paid": ",.2f"},
-            )
-        )
+        add(f"TOP CODES BY VOLUME (top {top_n}, {parse.kind})")
+        add(_text_table(source.utilization.head(top_n), _VOLUME_COLUMNS, _VOLUME_FORMATS))
     add("")
     return "\n".join(lines)
 
@@ -299,46 +308,37 @@ footer { margin-top: 3rem; color: #7b8794; font-size: 13px; }
 """
 
 
-def _eob_html(eob: EOBAudit | None, top_n: int) -> str:
-    if eob is None:
-        return ""
-    parse = eob.parse
+def _source_html(source: UtilizationAudit, top_n: int) -> str:
+    parse = source.parse
+    kind = html.escape(parse.kind)
     facts = {
-        "EOB source": parse.source,
+        "Source": parse.source,
         "Read": (
-            f"{parse.files_read:,} files / {parse.resources_read:,} resources / "
+            f"{parse.files_read:,} files / {parse.records_read:,} {_record_word(parse.kind)} / "
             f"{parse.line_items_read:,} line items / {parse.row_count:,} coded lines"
         ),
         "Line items with no usable HCPCS/CPT": f"{parse.line_items_without_code:,}",
-        "Non-EOB resources skipped": f"{parse.non_eob_resources:,}",
+        **{reason.capitalize(): f"{count:,}" for reason, count in parse.exclusions.items()},
         "Unreadable files": f"{len(parse.unreadable_files):,}",
     }
     facts_html = "".join(
         f"<dt>{html.escape(key)}</dt><dd>{html.escape(value)}</dd>" for key, value in facts.items()
     )
     return f"""
-<h2>Observed utilization (FHIR ExplanationOfBenefit)</h2>
+<h2>Observed utilization ({kind})</h2>
 <dl class="facts">{facts_html}</dl>
-<h2>Observed mix repriced at each payer's contracted rates</h2>
-{_html_table(eob.repriced, _reprice_columns(eob.repriced), _REPRICE_FORMATS)}
-<h2>Top codes by volume</h2>
-{
-        _html_table(
-            eob.utilization.head(top_n),
-            {
-                "code": "Code",
-                "code_type": "Type",
-                "line_items": "Lines",
-                "units": "Units",
-                "actual_paid": "Actually paid $",
-            },
-            {"line_items": ",d", "units": ",.0f", "actual_paid": ",.2f"},
-        )
-    }
+<h2>Observed mix repriced at each payer's contracted rates ({kind})</h2>
+{_html_table(source.repriced, _reprice_columns(source.repriced), _REPRICE_FORMATS)}
+<h2>Top codes by volume ({kind})</h2>
+{_html_table(source.utilization.head(top_n), _VOLUME_COLUMNS, _VOLUME_FORMATS)}
 """
 
 
-def render_html(result: AuditResult, top_n: int = _TOP_N, eob: EOBAudit | None = None) -> str:
+def render_html(
+    result: AuditResult,
+    top_n: int = _TOP_N,
+    sources: Sequence[UtilizationAudit] = (),
+) -> str:
     facts = header_facts(result)
     join = result.join
     join_rate = facts["join_rate"]
@@ -451,7 +451,7 @@ transfers to physician-office economics, the dollars do not.</p>
             {"min_dollar": ",.2f", "max_dollar": ",.2f", "gap": ",.2f", "payers": ",d"},
         )
     }
-{_eob_html(eob, top_n)}
+{"".join(_source_html(source, top_n) for source in sources)}
 <footer>Generated by payer-rate-audit. CPT descriptors are reproduced from the source MRF only;
 no AMA-licensed descriptor content is distributed with this tool.</footer>
 </body></html>

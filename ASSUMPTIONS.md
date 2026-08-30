@@ -155,6 +155,18 @@ Relative ordering of payers is unaffected.
   where a coding carries no system at all, a bare five-digit numeric is treated as CPT and a
   letter-plus-four-digits as HCPCS Level II. Anything else counts as an uncoded line item and
   is reported.
+- **835 reversals.** Take-back lines arrive with negative dollars and *positive* units, so
+  summing units as given would inflate volume while the dollars fell. Reversal lines have
+  their units negated, which nets them against the original line per code and payer, and
+  they are counted on their own exclusion line. Full correction/replacement semantics
+  (matching a reversal to its original claim, `PLB`, COB) are out of scope.
+- **835 scope is the service line.** Only `SVC` lines with an `HC` qualifier join to RVUs;
+  `NU`, `RB` and friends are counted out of scope exactly as DRG rows are on the MRF side.
+  Claim-level `CAS` adjustments and `PLB` provider-level adjustments are not applied, so
+  the 835 "actually paid" column is the sum of line-level `SVC02`, not the check amount.
+- **835 allowed amount.** Left empty rather than inferred: the allowed amount is only
+  recoverable by adding patient-responsibility `CAS` groups back to the paid amount, which
+  is claim-level adjustment logic this adapter deliberately does not do.
 - **Join rate.** Matched / in-scope CPT-HCPCS rows. Below `[audit].min_join_rate` (0.60)
   the tool warns loudly and exits `3`. Out-of-scope code types are excluded from the
   denominator of this rate — a DRG-priced file is not a broken join.

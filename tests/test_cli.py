@@ -159,3 +159,61 @@ def test_unreadable_eob_path_is_an_error(capsys, fixtures_dir, tmp_path):
         "--quiet",
     )
     assert code == 1
+
+
+def test_era_adds_the_repriced_table_and_csvs(tmp_path, capsys, fixtures_dir):
+    out_dir = tmp_path / "out"
+    code, out = _run(
+        capsys,
+        str(SHAPE_FIXTURES["csv_tall"]),
+        "--config",
+        CONFIG,
+        "--rvu-file",
+        str(fixtures_dir / "pprrvu_sample.csv"),
+        "--era",
+        str(fixtures_dir / "era"),
+        "--csv-out",
+        str(out_dir),
+    )
+    assert code == 0
+    assert "OBSERVED UTILIZATION (X12 835 remittance advice)" in out
+    assert "OBSERVED MIX REPRICED AT EACH PAYER'S CONTRACTED RATES (X12 835" in out
+    assert "reversal/negative service lines" in out
+    assert "non-HCPCS procedure qualifier" in out
+    assert {"era_repriced.csv", "era_utilization.csv"} <= {p.name for p in out_dir.iterdir()}
+    written = "\n".join(p.read_text(encoding="utf-8") for p in out_dir.iterdir())
+    for identifier in ("ACCT-10001", "DOEPATIENT", "SYNTHMEMBER1"):
+        assert identifier not in written and identifier not in out
+
+
+def test_era_and_eob_sources_are_reported_separately(capsys, fixtures_dir):
+    code, out = _run(
+        capsys,
+        str(SHAPE_FIXTURES["csv_tall"]),
+        "--config",
+        CONFIG,
+        "--rvu-file",
+        str(fixtures_dir / "pprrvu_sample.csv"),
+        "--eob",
+        str(fixtures_dir / "eob"),
+        "--era",
+        str(fixtures_dir / "era"),
+    )
+    assert code == 0
+    assert "OBSERVED UTILIZATION (FHIR ExplanationOfBenefit)" in out
+    assert "OBSERVED UTILIZATION (X12 835 remittance advice)" in out
+
+
+def test_unreadable_era_path_is_an_error(capsys, fixtures_dir, tmp_path):
+    code, _ = _run(
+        capsys,
+        str(SHAPE_FIXTURES["csv_tall"]),
+        "--config",
+        CONFIG,
+        "--rvu-file",
+        str(fixtures_dir / "pprrvu_sample.csv"),
+        "--era",
+        str(tmp_path / "absent"),
+        "--quiet",
+    )
+    assert code == 1

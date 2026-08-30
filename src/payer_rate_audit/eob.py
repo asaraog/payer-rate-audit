@@ -10,6 +10,9 @@ Input is either a directory of FHIR bundles / EOB resources (``*.json``,
 carries no usable HCPCS or CPT coding are counted and reported, never dropped
 in silence.
 
+Line items normalize to the shared table in :mod:`utilization`, which is what
+actually reprices them; this module only knows FHIR.
+
 Amount extraction follows the CARIN Blue Button adjudication slices and the
 Blue Button 2.0 variable code systems, because production files use both:
 ``submitted`` / ``eligible`` / ``benefit`` from the HL7 adjudication code
@@ -21,29 +24,39 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
-
 from .metrics import JoinResult
+from .utilization import (
+    LINE_COLUMNS,
+    LineFormatError,
+    LineSource,
+    UtilizationAudit,
+    audit_lines,
+    empty_frame,
+    input_files,
+    reprice,
+    to_frame,
+    utilization,
+)
 
-EOB_COLUMNS = [
-    "eob_id",
-    "source_file",
-    "payer_name",
-    "patient_id",
-    "line",
-    "code",
-    "code_type",
-    "modifiers",
-    "serviced_date",
-    "units",
-    "submitted_amount",
-    "allowed_amount",
-    "paid_amount",
+__all__ = [
+    "EOB_COLUMNS",
+    "EOBAudit",
+    "EOBFormatError",
+    "EOBParseResult",
+    "eob_audit",
+    "parse_eob",
+    "reprice",
+    "utilization",
 ]
+
+EOB_COLUMNS = LINE_COLUMNS
+KIND = "FHIR ExplanationOfBenefit"
+NON_EOB_RESOURCES = "non-EOB FHIR resources skipped"
+_SUFFIXES = {".json", ".ndjson"}
 
 # productOrService coding systems, mapped to the code_type this tool joins on.
 _CPT_SYSTEMS = ("ama-assn.org/go/cpt", "codesystem/cpt", "/sid/cpt")
@@ -80,26 +93,21 @@ _AMOUNT_CATEGORIES = {
 }
 
 
-class EOBFormatError(ValueError):
+class EOBFormatError(LineFormatError):
     """Raised when a file contains no FHIR resource this module can read."""
 
 
 @dataclass
-class EOBParseResult:
-    """Parsed EOB line items plus the counts needed to state a denominator."""
-
-    frame: pd.DataFrame
-    source: str
-    files_read: int = 0
-    resources_read: int = 0
-    line_items_read: int = 0
-    line_items_without_code: int = 0
-    non_eob_resources: int = 0
-    unreadable_files: list[str] = field(default_factory=list)
+class EOBParseResult(LineSource):
+    """Parsed EOB line items, in FHIR's vocabulary."""
 
     @property
-    def row_count(self) -> int:
-        return len(self.frame)
+    def resources_read(self) -> int:
+        return self.records_read
+
+    @property
+    def non_eob_resources(self) -> int:
+        return self.exclusions.get(NON_EOB_RESOURCES, 0)
 
 
 def _text(value: Any) -> str:
@@ -214,29 +222,18 @@ def _iter_payloads(path: Path) -> Iterator[Any]:
         yield json.load(handle)
 
 
-def _input_files(path: Path) -> list[Path]:
-    if path.is_file():
-        return [path]
-    files = sorted(
-        candidate
-        for candidate in path.rglob("*")
-        if candidate.is_file() and candidate.suffix.lower() in {".json", ".ndjson"}
-    )
-    if not files:
-        raise EOBFormatError(f"{path}: no .json or .ndjson files found")
-    return files
-
-
 def parse_eob(path: str | Path) -> EOBParseResult:
     """Parse a directory of EOB bundles, or a single JSON/NDJSON file."""
     root = Path(path)
-    if not root.exists():
-        raise EOBFormatError(f"{root}: no such file or directory")
-
     records: list[dict[str, Any]] = []
-    result = EOBParseResult(frame=pd.DataFrame(columns=EOB_COLUMNS), source=str(root))
+    result = EOBParseResult(frame=empty_frame(), source=str(root), kind=KIND)
 
-    for file_path in _input_files(root):
+    try:
+        files = input_files(root, _SUFFIXES)
+    except LineFormatError as error:
+        raise EOBFormatError(str(error)) from error
+
+    for file_path in files:
         try:
             payloads = list(_iter_payloads(file_path))
         except (json.JSONDecodeError, UnicodeDecodeError):
@@ -245,12 +242,11 @@ def parse_eob(path: str | Path) -> EOBParseResult:
         result.files_read += 1
         for payload in payloads:
             for resource in _iter_resources(payload):
-                result.resources_read += 1
+                result.records_read += 1
                 if resource.get("resourceType") != "ExplanationOfBenefit":
-                    result.non_eob_resources += 1
+                    result.exclude(NON_EOB_RESOURCES)
                     continue
                 payer = _payer_name(resource)
-                patient = _text((resource.get("patient") or {}).get("reference"))
                 for item in resource.get("item", []) or []:
                     result.line_items_read += 1
                     picked = _pick_code(item.get("productOrService"))
@@ -262,10 +258,8 @@ def parse_eob(path: str | Path) -> EOBParseResult:
                     quantity = (item.get("quantity") or {}).get("value")
                     records.append(
                         {
-                            "eob_id": _text(resource.get("id")),
                             "source_file": file_path.name,
                             "payer_name": payer,
-                            "patient_id": patient,
                             "line": item.get("sequence"),
                             "code": code,
                             "code_type": code_type,
@@ -279,110 +273,13 @@ def parse_eob(path: str | Path) -> EOBParseResult:
     if result.files_read == 0:
         raise EOBFormatError(f"{root}: no readable JSON found ({len(result.unreadable_files)} bad)")
 
-    frame = pd.DataFrame(records, columns=EOB_COLUMNS)
-    for column in ("units", "submitted_amount", "allowed_amount", "paid_amount"):
-        frame[column] = pd.to_numeric(frame[column], errors="coerce")
-    result.frame = frame
+    result.frame = to_frame(records)
     return result
 
 
-@dataclass
-class EOBAudit:
-    """Everything the report needs about the utilization layer."""
-
-    parse: EOBParseResult
-    utilization: pd.DataFrame
-    repriced: pd.DataFrame
+EOBAudit = UtilizationAudit
 
 
-def utilization(parse: EOBParseResult) -> pd.DataFrame:
-    """Observed service mix: units and actual dollars per code."""
-    frame = parse.frame
-    if frame.empty:
-        return pd.DataFrame(columns=["code", "code_type", "line_items", "units", "actual_paid"])
-    return (
-        frame.groupby(["code", "code_type"], as_index=False)
-        .agg(
-            line_items=("code", "size"),
-            units=("units", "sum"),
-            actual_paid=("paid_amount", "sum"),
-            actual_allowed=("allowed_amount", "sum"),
-        )
-        .sort_values("units", ascending=False)
-        .reset_index(drop=True)
-    )
-
-
-def reprice(parse: EOBParseResult, join: JoinResult, group_by: str = "plan") -> pd.DataFrame:
-    """Reprice the observed service mix at each payer's contracted rate.
-
-    The rate used for a code is the mean negotiated dollar across that payer's
-    rows for the code, so a payer with several rows for one code (different
-    settings, modifiers) does not get counted several times. Codes the payer
-    does not price are excluded and counted per payer, because a payer cannot
-    be charged with a rate it never published.
-    """
-    keys = ["payer_name", "plan_name"] if group_by == "plan" else ["payer_name"]
-    volume = utilization(parse)
-    empty = pd.DataFrame(
-        columns=[
-            *keys,
-            "codes_priced",
-            "codes_unpriced",
-            "units_priced",
-            "actual_paid",
-            "repriced",
-            "delta",
-            "ratio",
-        ]
-    )
-    if volume.empty:
-        return empty
-
-    priced = join.frame[join.frame["negotiated_dollar"].notna()]
-    if priced.empty:
-        return empty
-    rates = (
-        priced.groupby([*keys, "code", "code_type"], as_index=False)["negotiated_dollar"]
-        .mean()
-        .rename(columns={"negotiated_dollar": "rate"})
-    )
-
-    merged = rates.merge(volume, on=["code", "code_type"], how="right")
-    merged["matched"] = merged["rate"].notna()
-    matched = merged[merged["matched"]].copy()
-    if matched.empty:
-        return empty
-    matched["repriced"] = matched["rate"] * matched["units"]
-
-    codes_in_volume = len(volume)
-    table = matched.groupby(keys, as_index=False).agg(
-        codes_priced=("code", "nunique"),
-        units_priced=("units", "sum"),
-        actual_paid=("actual_paid", "sum"),
-        repriced=("repriced", "sum"),
-    )
-    table["codes_unpriced"] = codes_in_volume - table["codes_priced"]
-    table["delta"] = table["repriced"] - table["actual_paid"]
-    table["ratio"] = table["repriced"] / table["actual_paid"].replace(0, pd.NA)
-    columns = [
-        *keys,
-        "codes_priced",
-        "codes_unpriced",
-        "units_priced",
-        "actual_paid",
-        "repriced",
-        "delta",
-        "ratio",
-    ]
-    return table[columns].sort_values("repriced", ascending=False).reset_index(drop=True)
-
-
-def eob_audit(path: str | Path, join: JoinResult, group_by: str = "plan") -> EOBAudit:
+def eob_audit(path: str | Path, join: JoinResult, group_by: str = "plan") -> UtilizationAudit:
     """Parse EOBs and reprice the observed mix at each payer's contracted rates."""
-    parse = parse_eob(path)
-    return EOBAudit(
-        parse=parse,
-        utilization=utilization(parse),
-        repriced=reprice(parse, join, group_by=group_by),
-    )
+    return audit_lines(parse_eob(path), join, group_by=group_by)
