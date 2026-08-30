@@ -62,10 +62,10 @@ Reads any hospital's CMS price transparency file — all three official shapes
 - National RVUs, no locality adjustment (but useful when comparing payers at the
   same facility).
 - Repricing is arithmetic on posted rates — not an adjudication model.
-- Professional rows are priced on facility total RVUs; institutional and blank
-  rows on non-facility totals. This is the most consequential call in the tool:
-  payers with mostly-institutional rows score systematically lower, so compare
-  payers within one file, carefully across files.
+- A code's RVUs depend on who pays the overhead, so professional and
+  institutional rows use different RVU totals. Two payers can post the same
+  dollar and score differently because of it: safe within one hospital's file,
+  risky across files.
 - Rows priced as a percentage or algorithm are excluded and counted, never
   converted to invented dollars.
 
