@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Compute each payer's effective conversion factor from hospital price transparency machine-readable files and the CMS Physician Fee Schedule RVU file."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = { text = "BSD-3-Clause" }
 dependencies = ["pandas>=2.0"]
 
 [project.optional-dependencies]

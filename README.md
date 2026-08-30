@@ -58,11 +58,16 @@ Reads any hospital's CMS price transparency file — all three official shapes
 ## Limits
 
 - Hospital files carry hospital outpatient rates — higher than physician-office
-  rates. The method transfers; the dollars don't.
-- National RVUs, no locality adjustment (cancels out when comparing payers at
-  the same hospital).
+  rates.
+- National RVUs, no locality adjustment (but useful when comparing payers at the
+  same facility).
 - Repricing is arithmetic on posted rates — not an adjudication model.
-- Domain judgment calls are in [ASSUMPTIONS.md](ASSUMPTIONS.md).
+- Professional rows are priced on facility total RVUs; institutional and blank
+  rows on non-facility totals. This is the most consequential call in the tool:
+  payers with mostly-institutional rows score systematically lower, so compare
+  payers within one file, carefully across files.
+- Rows priced as a percentage or algorithm are excluded and counted, never
+  converted to invented dollars.
 
 No PHI anywhere: inputs are public files and synthetic fixtures. CPT descriptors
-(AMA-copyrighted) are never committed. Tests: `pytest` (95). MIT license.
+(AMA-copyrighted) are never committed. Tests: `pytest` (95). BSD 3-Clause license.
