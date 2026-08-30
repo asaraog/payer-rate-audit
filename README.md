@@ -40,6 +40,27 @@ payer-rate-audit MRF --csv-out out/          # payer table, spread, cash flags, 
 payer-rate-audit MRF --eob eobs/             # reprice your observed mix (below)
 ```
 
+## Example: a real hospital
+
+Run against Community Hospital (Fairfax, MO)'s published
+[standard charges file](https://fairfaxmed.com/wp-content/uploads/2026/03/STANDARD-CHARGES-DOWNLOAD-2026-01-01.csv)
+(3,789 rows, CSV tall, v2.0.0 template — 97.7% join rate):
+
+```
+Payer                      Effective CF  x Medicare
+UNITED HEALTHCARE PPO      142.31        4.26
+CIGNA COMMERCIAL PPO       129.78        3.89
+AETNA COMMERCIAL PPO       121.26        3.63
+BCBS COMMERCIAL PPO        104.85        3.14
+AMBETTER PPO               64.21         1.92
+```
+
+Same hospital, same procedures: a 2.2x gap between the best and worst contract.
+One excision code (11426) spans $318 to $4,977 across payers. The multiples run
+high because these are hospital outpatient rates (see Honest limits) — even the
+Medicare Advantage plan in the file sits at 3.19x, where physician-office MA
+would hug 1.0x.
+
 ## What it reports
 
 1. **Effective conversion factor** per payer and plan, sorted.
