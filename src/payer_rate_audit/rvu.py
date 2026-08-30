@@ -48,8 +48,7 @@ _HEADER_NAMES = {
     "global_days": "GLOB DAYS",
 }
 
-_NUMERIC_FIELDS = ("work_rvu", "nonfac_pe_rvu", "fac_pe_rvu", "mp_rvu",
-                   "nonfac_total", "fac_total")
+_NUMERIC_FIELDS = ("work_rvu", "nonfac_pe_rvu", "fac_pe_rvu", "mp_rvu", "nonfac_total", "fac_total")
 
 # Modifiers that select a distinct priced row in the PPRRVU file. Every other
 # modifier (50, 59, LT, ...) is a payment-adjustment modifier with no separate
@@ -81,7 +80,7 @@ def _normalize(text: str) -> str:
 
 def _locate_columns(rows: list[list[str]], header_index: int) -> dict[str, int]:
     """Match each required field to a column index using the stacked header rows."""
-    stack = rows[max(0, header_index - _HEADER_STACK_DEPTH):header_index + 1]
+    stack = rows[max(0, header_index - _HEADER_STACK_DEPTH) : header_index + 1]
     width = max(len(row) for row in stack)
     composites: dict[int, str] = {}
     for column in range(width):
@@ -137,7 +136,7 @@ def parse_pprrvu(path: str | Path, year: int | None = None) -> RVUTable:
     positions = _locate_columns(rows, header_index)
 
     records = []
-    for row in rows[header_index + 1:]:
+    for row in rows[header_index + 1 :]:
         if not row or not row[0].strip():
             continue
         hcpcs = row[positions["hcpcs"]].strip().upper() if positions["hcpcs"] < len(row) else ""

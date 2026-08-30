@@ -18,8 +18,12 @@ def _run(capsys, *args) -> tuple[int, str]:
 @pytest.mark.parametrize("path", SHAPE_FIXTURES.values(), ids=list(SHAPE_FIXTURES))
 def test_console_report_states_its_denominators(capsys, fixtures_dir, path):
     code, out = _run(
-        capsys, str(path), "--config", CONFIG,
-        "--rvu-file", str(fixtures_dir / "pprrvu_sample.csv"),
+        capsys,
+        str(path),
+        "--config",
+        CONFIG,
+        "--rvu-file",
+        str(fixtures_dir / "pprrvu_sample.csv"),
     )
     assert code == 0
     assert "EFFECTIVE CONVERSION FACTOR BY PAYER" in out
@@ -36,8 +40,12 @@ def test_console_report_states_its_denominators(capsys, fixtures_dir, path):
 
 def test_payer_table_is_sorted_by_effective_conversion_factor(capsys, fixtures_dir):
     _, out = _run(
-        capsys, str(SHAPE_FIXTURES["csv_tall"]), "--config", CONFIG,
-        "--rvu-file", str(fixtures_dir / "pprrvu_sample.csv"),
+        capsys,
+        str(SHAPE_FIXTURES["csv_tall"]),
+        "--config",
+        CONFIG,
+        "--rvu-file",
+        str(fixtures_dir / "pprrvu_sample.csv"),
     )
     assert out.index("Alpha Health") < out.index("Beta Mutual")
 
@@ -45,9 +53,15 @@ def test_payer_table_is_sorted_by_effective_conversion_factor(capsys, fixtures_d
 def test_html_is_self_contained(tmp_path, capsys, fixtures_dir):
     target = tmp_path / "report.html"
     code, _ = _run(
-        capsys, str(SHAPE_FIXTURES["json"]), "--config", CONFIG,
-        "--rvu-file", str(fixtures_dir / "pprrvu_sample.csv"),
-        "--html", str(target), "--quiet",
+        capsys,
+        str(SHAPE_FIXTURES["json"]),
+        "--config",
+        CONFIG,
+        "--rvu-file",
+        str(fixtures_dir / "pprrvu_sample.csv"),
+        "--html",
+        str(target),
+        "--quiet",
     )
     assert code == 0
     html = target.read_text(encoding="utf-8")
@@ -65,8 +79,12 @@ def test_low_join_rate_is_reported_and_exits_nonzero(capsys, fixtures_dir, tmp_p
         encoding="utf-8",
     )
     code, out = _run(
-        capsys, str(SHAPE_FIXTURES["csv_tall"]), "--config", str(config),
-        "--rvu-file", str(fixtures_dir / "pprrvu_sample.csv"),
+        capsys,
+        str(SHAPE_FIXTURES["csv_tall"]),
+        "--config",
+        str(config),
+        "--rvu-file",
+        str(fixtures_dir / "pprrvu_sample.csv"),
     )
     assert code == 3
     assert "Join rate is 80.0%" in out
@@ -80,11 +98,64 @@ def test_missing_config_is_an_error(capsys, tmp_path, fixtures_dir):
 def test_csv_outputs(tmp_path, capsys, fixtures_dir):
     out_dir = tmp_path / "out"
     code, _ = _run(
-        capsys, str(SHAPE_FIXTURES["csv_wide"]), "--config", CONFIG,
-        "--rvu-file", str(fixtures_dir / "pprrvu_sample.csv"),
-        "--csv-out", str(out_dir), "--quiet",
+        capsys,
+        str(SHAPE_FIXTURES["csv_wide"]),
+        "--config",
+        CONFIG,
+        "--rvu-file",
+        str(fixtures_dir / "pprrvu_sample.csv"),
+        "--csv-out",
+        str(out_dir),
+        "--quiet",
     )
     assert code == 0
     written = sorted(path.name for path in out_dir.iterdir())
-    assert written == ["cash_beats_contract.csv", "payer_table.csv", "spread.csv",
-                       "unmatched_codes.csv"]
+    assert written == [
+        "cash_beats_contract.csv",
+        "payer_table.csv",
+        "spread.csv",
+        "unmatched_codes.csv",
+    ]
+
+
+def test_eob_adds_utilization_repricing_and_csvs(tmp_path, capsys, fixtures_dir):
+    out_dir = tmp_path / "out"
+    html = tmp_path / "report.html"
+    code, out = _run(
+        capsys,
+        str(SHAPE_FIXTURES["csv_tall"]),
+        "--config",
+        CONFIG,
+        "--rvu-file",
+        str(fixtures_dir / "pprrvu_sample.csv"),
+        "--eob",
+        str(fixtures_dir / "eob"),
+        "--csv-out",
+        str(out_dir),
+        "--html",
+        str(html),
+    )
+    assert code == 0
+    assert "OBSERVED UTILIZATION" in out
+    assert "no usable HCPCS/CPT : 2 line items" in out
+    assert "OBSERVED MIX REPRICED" in out
+    assert {"eob_repriced.csv", "eob_utilization.csv"} <= {p.name for p in out_dir.iterdir()}
+    report = html.read_text(encoding="utf-8")
+    assert "Observed mix repriced" in report
+    for external in ("http://", "https://", "<script", "cdn.", "src="):
+        assert external not in report
+
+
+def test_unreadable_eob_path_is_an_error(capsys, fixtures_dir, tmp_path):
+    code, _ = _run(
+        capsys,
+        str(SHAPE_FIXTURES["csv_tall"]),
+        "--config",
+        CONFIG,
+        "--rvu-file",
+        str(fixtures_dir / "pprrvu_sample.csv"),
+        "--eob",
+        str(tmp_path / "absent"),
+        "--quiet",
+    )
+    assert code == 1

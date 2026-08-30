@@ -1,6 +1,7 @@
 """Effective conversion factor auditing for hospital price transparency files."""
 
 from .config import Config, load_config
+from .eob import EOB_COLUMNS, EOBAudit, EOBParseResult, eob_audit, parse_eob
 from .metrics import AuditResult, audit, header_facts
 from .mrf import NORMALIZED_COLUMNS, MRFShape, ParseResult, detect_shape, parse_mrf
 from .rvu import RVU_COLUMNS, RVUTable, load_rvu_table, parse_pprrvu
@@ -9,6 +10,11 @@ __all__ = [
     "Config",
     "load_config",
     "AuditResult",
+    "EOB_COLUMNS",
+    "EOBAudit",
+    "EOBParseResult",
+    "eob_audit",
+    "parse_eob",
     "audit",
     "header_facts",
     "MRFShape",

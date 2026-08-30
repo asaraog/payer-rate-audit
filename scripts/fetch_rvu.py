@@ -60,7 +60,7 @@ def discover_release(year: int, release: str | None = None) -> str:
         )
     # Releases run A through D through the year; a revision of a release appends
     # "R" (rvu24ar) and supersedes the release it revises.
-    return max(slugs, key=lambda slug: (slug[len(f"rvu{suffix}"):], len(slug)))
+    return max(slugs, key=lambda slug: (slug[len(f"rvu{suffix}") :], len(slug)))
 
 
 def discover_zip_url(slug: str) -> str:
@@ -85,8 +85,10 @@ def download(url: str, destination: Path, force: bool = False) -> Path:
             "This is usually an error page rather than the RVU file."
         )
     destination.write_bytes(payload)
-    print(f"[ok  ] {destination} ({len(payload):,} bytes, sha256 "
-          f"{hashlib.sha256(payload).hexdigest()[:16]}...)")
+    print(
+        f"[ok  ] {destination} ({len(payload):,} bytes, sha256 "
+        f"{hashlib.sha256(payload).hexdigest()[:16]}...)"
+    )
     return destination
 
 
@@ -103,9 +105,7 @@ def extract_pprrvu(archive: Path, data_dir: Path, force: bool = False) -> Path:
             if re.search(r"PPRRVU.*nonQPP.*\.csv$", name, flags=re.IGNORECASE)
         ] or [name for name in names if re.search(r"PPRRVU.*\.csv$", name, flags=re.IGNORECASE)]
         if not candidates:
-            raise FetchError(
-                f"{archive} contains no PPRRVU CSV. Archive members: {names}"
-            )
+            raise FetchError(f"{archive} contains no PPRRVU CSV. Archive members: {names}")
         member = sorted(candidates)[0]
         target = data_dir / Path(member).name
         if target.exists() and not force:

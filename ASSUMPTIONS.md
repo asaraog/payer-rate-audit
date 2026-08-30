@@ -145,6 +145,16 @@ Relative ordering of payers is unaffected.
   excluded and counted on its own exclusion line.
 - **Spread.** Computed only over codes priced by more than one payer; a single-payer code
   has a spread of zero by construction and would crowd the ranking.
+- **EOB repricing rate.** When a payer has several MRF rows for one observed code (different
+  settings, modifiers, plans), repricing uses the **mean** negotiated dollar for that payer
+  and code rather than min, max, or the first row: no observed-setting information exists in
+  an EOB line to pick among them, and a mean does not systematically flatter or punish a
+  payer. Codes a payer does not publish are excluded from its repriced total and counted on
+  its own `codes unpriced` column — a payer cannot be charged with a rate it never posted.
+- **EOB coding fallback.** `item.productOrService` codings are read by system (CPT, HCPCS);
+  where a coding carries no system at all, a bare five-digit numeric is treated as CPT and a
+  letter-plus-four-digits as HCPCS Level II. Anything else counts as an uncoded line item and
+  is reported.
 - **Join rate.** Matched / in-scope CPT-HCPCS rows. Below `[audit].min_join_rate` (0.60)
   the tool warns loudly and exits `3`. Out-of-scope code types are excluded from the
   denominator of this rate — a DRG-priced file is not a broken join.
