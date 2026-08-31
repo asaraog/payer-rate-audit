@@ -7,3 +7,6 @@ __pycache__/
 .venv/
 venv/
 report.html
+
+# Local-only: job-search context, never publish
+Atlas Billing/
